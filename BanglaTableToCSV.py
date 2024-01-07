@@ -39,38 +39,6 @@ def PIL_to_cv2(PILimage):
 
 #The next three functions define a way cut up an image of a table into its distinct cells. We will apply an OCR to these cells later.
 
-def getCellCoordsFromPath(imagePath:str)->list:
-    """This function takes an image (its path, anyways) and returns a list of the of leftmost, topmost, rightmost, and bottomost pixel
-    coordinates for each cell of the table. The list is order going right to left, bottom to top."""
-    im = cv2.imread(imagePath) 
-
-    #Some code below is overly sophisticated. Images should already be made black and white.
-    imgray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-
-    _, thresh = cv2.threshold(imgray, 127, 255, 0)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    #filter noise
-    contours = [cont for cont in contours if cv2.contourArea(cont) > 1000]
-
-    #get rid of text
-
-    contours = [cv2.convexHull(cont) for cont in contours]
-    
-    contours = contours[2:]  
-    #Improve: ^ this removes the perimeter of the image and the perimeter of the table as a contour. 
-    #           it might be better to remove these by filtering out contours with large areas. 
-    
-    lst=[]
-    for cont in contours:
-        R = cont[0][0][0]
-        T = cont[0][0][1]
-        L = cont[2][0][0]
-        B = cont[2][0][1]
-        if len(cont) == 4: #this if statement is just to fallible check on whether or not the contour is a box. Page 14 had the original issue
-            lst.append((L,T,R,B))
-        
-    return lst
 
 def getCellCoordsFromImage(im:str)->list:
     """This function takes a PIL image and returns a list of the of leftmost, topmost, rightmost, and bottomost pixel
@@ -125,13 +93,12 @@ def getColumnListCoords(lst:list)->list:
         
     return L
 
-def getColumnsOfCellCoordsFromPath(imagePath:str)->list:
-    '''Gets columns of cell coordinates (left-most,top-most,right-most,bottom-most) from an image path.'''
-    return getColumnListCoords(getCellCoordsFromPath(imagePath))
 
 def getColumnsOfCellCoordsFromImage(im)->list:
     '''Gets columns of cell coordinates (left-most,top-most,right-most,bottom-most) from an image.'''
     return getColumnListCoords(getCellCoordsFromImage(im))
+
+
 ########################################################################################################################################
 ########################################################################################################################################
 
@@ -154,16 +121,6 @@ def trim(im):
 
 
 
-def splitLinesOLD(im):
-    '''Splits images if there are multiple lines of text. Only works if there's 1 or 2 lines of text. Returns list of image(s).'''
-    im = trim(im)
-    mid = im.height//2
-    midLine = np.array(im.getdata()).reshape((im.size[1], im.size[0]))[mid]
-    val = list(midLine) == list(np.repeat(255,im.width))
-    if val == True:
-        return [im.crop((0,0,im.width,mid)),im.crop((0,mid,im.width,im.height))]
-    else:
-        return [im]
     
 def splitLines(im):
     '''Splits images accross lines of text. Returns list of images of each line'''
@@ -241,11 +198,6 @@ def getTextFromCellWith1Line(im):
     return text
 
 
-def getTextFromCellOLD(im):
-    '''Takes an image of cell containing text (could be on multiple lines) and returns the Bangla text.'''
-    imageList = splitLinesOLD(im)
-    textList = [getTextFromCellWith1Line(image) for image in imageList]
-    return ' '.join(textList)
 
 def getTextFromCell(im):
     '''Takes an image of cell containing text (could be on multiple lines) and returns the Bangla text.'''
@@ -277,41 +229,6 @@ def trueBlackAndWhite(im):
     return im
 
 
-def getDataFrameFromImageFromPath(imagePath):
-    '''takes a path to an image (should be black and and  white) of a table in Bangla, and returns a dataframe
-      and a list of cell coordinates to cells whose text went unrecognized by the OCR.'''
-    image = Image.open(imagePath)
-
-    #table image preprocessing
-    image = trueBlackAndWhite(image)
-
-    listOfColCoords = getColumnsOfCellCoordsFromPath(imagePath)
-    dic={}
-    ListOfUnread = []
-    for colOfCoords in listOfColCoords:
-        
-        label = getTextFromCellOLD(image.crop(colOfCoords[0]))
-
-        colOfCoords = colOfCoords[1:]
-        col = []
-        for coord in colOfCoords:
-            cell = image.crop(coord)
-            if isCellEmpty(cell) == False: 
-
-                bText = getTextFromCellOLD(image.crop(coord))
-                
-                if bText == '':
-                    ListOfUnread.append(coord)
-                    bText ='OCR ERROR' + str(coord)
-
-                    
-                col.append(bText)
-            else:
-                col.append('')
-        dic[label] = col
-    return pd.DataFrame(dic), ListOfUnread 
-
-#The function defined below differs from the previous in more than just input
 
 def getDataFrameFromImage(image):
     '''takes an image (should be black and and  white) of a table in Bangla, and returns a dataframe
@@ -346,4 +263,4 @@ def getDataFrameFromImage(image):
         dic[label] = col
     return pd.DataFrame(dic), ListOfUnread 
 
-#print(os.getcwd())
+
